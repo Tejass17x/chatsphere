@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx expo *)",
+      "Bash(node -e \"const f=require\\('firebase/package.json'\\);console.log\\(f.version\\)\")",
+      "Bash(grep -o \"^  '\\\\{0,1\\\\}[a-z-]*'\\\\?:\")",
+      "Bash(npx firebase *)",
+      "Bash(java -version)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(node -e ' *)",
+      "WebFetch(domain:firebase.google.com)",
+      "WebSearch"
+    ]
+  }
+}
