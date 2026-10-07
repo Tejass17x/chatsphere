@@ -1,6 +1,6 @@
 // App constants and configuration
 
-export const APP_NAME = 'ChatApp';
+export const APP_NAME = 'ChatSphere';
 export const APP_SCHEME = 'chatapp';
 
 // Firestore collection names

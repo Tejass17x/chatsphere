@@ -71,6 +71,7 @@ export interface Notification {
   data: {
     fromUserId: string;
     chatId?: string;
+    messageId?: string;
   };
   read: boolean;
   createdAt: Date;

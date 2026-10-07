@@ -10,8 +10,10 @@ import {
   TouchableOpacity,
   Keyboard,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import type { QueryDocumentSnapshot } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import {
@@ -43,12 +45,14 @@ export default function SearchScreen() {
   const router = useRouter();
   const { user, firebaseUser, patchUser, refreshProfile } = useAuth();
   const { notifyFollowRequest, notifyFollowAccepted } = useNotifications();
+  const userRef = useRef(user);
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<UserWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [initialLoad, setInitialLoad] = useState(true);
   const [actingOn, setActingOn] = useState<Record<string, boolean>>({});
   // Opening a chat is a network round-trip, so it needs its own busy flag;
@@ -57,14 +61,32 @@ export default function SearchScreen() {
   // Errors are shown inline rather than through Alert.alert, which is a no-op
   // on react-native-web and would leave failures completely invisible.
   const [actionError, setActionError] = useState<string | null>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const withStatus = useCallback(
     (list: UserProfile[]): UserWithStatus[] => {
-      if (!user) return list.map((u) => ({ ...u, followStatus: 'none' as FollowStatus }));
-      return list.map((u) => ({ ...u, followStatus: computeFollowStatus(user, u) }));
+      const currentUser = userRef.current;
+      if (!currentUser) return list.map((u) => ({ ...u, followStatus: 'none' as FollowStatus }));
+      return list.map((u) => ({ ...u, followStatus: computeFollowStatus(currentUser, u) }));
     },
-    [user]
+    []
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        Keyboard.dismiss();
+        router.replace('/(tabs)/chats');
+        return true;
+      });
+
+      return () => subscription.remove();
+    }, [router])
   );
 
   useEffect(() => {
@@ -76,9 +98,16 @@ export default function SearchScreen() {
 
   // Debounced search
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!firebaseUser) return;
+    const requestId = ++searchRequestRef.current;
+    if (!firebaseUser) {
+      setLoading(false);
+      setInitialLoad(false);
+      return;
+    }
 
     setLoading(true);
+    setLoadingMore(false);
+    setSearchError(null);
     setUsers([]);
     setLastDoc(null);
     setHasMore(true);
@@ -91,14 +120,24 @@ export default function SearchScreen() {
         result = await getAllUsers(firebaseUser.uid);
       }
 
+      if (requestId !== searchRequestRef.current) return;
       setUsers(withStatus(result.users));
       setLastDoc(result.lastDoc);
       setHasMore(!!result.lastDoc);
     } catch (error) {
       console.error('Search failed:', error);
+      if (requestId === searchRequestRef.current) {
+        setSearchError(
+          error instanceof Error
+            ? error.message
+            : 'Could not search users. Check your connection and try again.'
+        );
+      }
     } finally {
-      setLoading(false);
-      setInitialLoad(false);
+      if (requestId === searchRequestRef.current) {
+        setLoading(false);
+        setInitialLoad(false);
+      }
     }
   }, [firebaseUser, withStatus]);
 
@@ -107,6 +146,7 @@ export default function SearchScreen() {
     if (!firebaseUser || loadingMore || !hasMore || !lastDoc) return;
 
     setLoadingMore(true);
+    const requestId = searchRequestRef.current;
 
     try {
       // Both branches share this exact shape, so name it explicitly rather
@@ -118,24 +158,36 @@ export default function SearchScreen() {
         result = await getAllUsers(firebaseUser.uid, 20, lastDoc);
       }
 
+      if (requestId !== searchRequestRef.current) return;
       setUsers((prev) => [...prev, ...withStatus(result.users)]);
       setLastDoc(result.lastDoc);
       setHasMore(!!result.lastDoc);
     } catch (error) {
       console.error('Load more failed:', error);
+      if (requestId === searchRequestRef.current) {
+        setSearchError(
+          error instanceof Error
+            ? error.message
+            : 'Could not load more users. Check your connection and try again.'
+        );
+      }
     } finally {
-      setLoadingMore(false);
+      if (requestId === searchRequestRef.current) {
+        setLoadingMore(false);
+      }
     }
   }, [firebaseUser, query, loadingMore, hasMore, lastDoc, withStatus]);
 
   // Handle search input
   const handleSearchChange = (text: string) => {
     setQuery(text);
+    setSearchError(null);
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
+    searchRequestRef.current += 1;
     debounceRef.current = setTimeout(() => {
       performSearch(text);
     }, 300);
@@ -145,6 +197,7 @@ export default function SearchScreen() {
   useEffect(() => {
     performSearch('');
     return () => {
+      searchRequestRef.current += 1;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [performSearch]);
@@ -473,6 +526,14 @@ export default function SearchScreen() {
           </TouchableOpacity>
         ) : null}
       </View>
+      {searchError ? (
+        <ErrorBanner
+          message={searchError}
+          actionLabel="Retry"
+          onAction={() => performSearch(query)}
+          onDismiss={() => setSearchError(null)}
+        />
+      ) : null}
       {actionError ? <ErrorBanner message={actionError} onDismiss={() => setActionError(null)} /> : null}
     </View>
   );
@@ -493,7 +554,7 @@ export default function SearchScreen() {
     );
   }
 
-  if (users.length === 0 && !loading) {
+  if (users.length === 0 && !loading && !searchError) {
     return (
       <View style={styles.container}>
         <AppHeader title="Search" subtitle="Find people to connect with" />

@@ -10,7 +10,8 @@
       "Bash(echo \"exit: $?\")",
       "Bash(node -e ' *)",
       "WebFetch(domain:firebase.google.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python -c ' *)"
     ]
   }
 }

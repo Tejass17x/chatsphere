@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -17,7 +18,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { COLORS, SPACING, BORDER_RADIUS, ERROR_MESSAGES, PATTERNS } from '@/utils/constants';
-import { shadow } from '@/utils/shadows';
 import { getFirebaseErrorMessage } from '@/utils/firebaseErrors';
 
 export default function RegisterScreen() {
@@ -99,11 +99,14 @@ export default function RegisterScreen() {
       >
         {/* Logo / Title */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <LucideIcon name="message-circle" size={60} color={COLORS.primary} />
-          </View>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="ChatSphere logo"
+          />
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join ChatApp and start connecting</Text>
+          <Text style={styles.subtitle}>Join ChatSphere and start connecting</Text>
         </View>
 
         {/* Form */}
@@ -213,14 +216,10 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
     gap: SPACING.md,
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: BORDER_RADIUS.xl,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow({ color: COLORS.primary, offset: { width: 0, height: 4 }, opacity: 0.2, radius: 8, elevation: 8 }),
+  logo: {
+    width: '100%',
+    maxWidth: 280,
+    height: 196,
   },
   title: {
     fontSize: 28,

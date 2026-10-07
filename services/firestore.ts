@@ -92,7 +92,7 @@ export async function getUserProfiles(uids: string[]): Promise<UserProfile[]> {
   );
 }
 
-// Search users by display name or email
+// Search users by display name
 export async function searchUsers(
   searchTerm: string,
   currentUserId: string,
@@ -100,32 +100,47 @@ export async function searchUsers(
   lastDoc?: QueryDocumentSnapshot
 ): Promise<{ users: UserProfile[]; lastDoc: QueryDocumentSnapshot | null }> {
   const usersRef = collection(db, COLLECTIONS.USERS);
+  const normalizedTerm = searchTerm.trim().toLowerCase();
+  if (!normalizedTerm || pageSize <= 0) return { users: [], lastDoc: null };
 
-  // Firestore doesn't support full-text search natively
-  // We'll use a prefix search on displayName (case-insensitive would require Algolia)
-  const searchLower = searchTerm.toLowerCase();
+  // Scan ordered pages so profiles without the optional displayNameLower
+  // field (older accounts) are searchable too.
+  const scanPageSize = 100;
+  const matches: { user: UserProfile; snapshot: QueryDocumentSnapshot }[] = [];
+  let cursor = lastDoc;
+  let reachedEnd = false;
 
-  let q = query(
-    usersRef,
-    where('displayName', '>=', searchTerm),
-    where('displayName', '<=', searchTerm + ''),
-    limit(pageSize + 1) // +1 to check if there are more
-  );
+  while (matches.length <= pageSize && !reachedEnd) {
+    let q = query(usersRef, orderBy('displayName'), limit(scanPageSize));
+    if (cursor) {
+      q = query(q, startAfter(cursor));
+    }
 
-  if (lastDoc) {
-    q = query(q, startAfter(lastDoc));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) break;
+
+    for (const userDoc of snapshot.docs) {
+      const user = docToUserProfile(userDoc);
+      if (
+        user
+        && user.uid !== currentUserId
+        && user.displayName.trim().toLowerCase().startsWith(normalizedTerm)
+      ) {
+        matches.push({ user, snapshot: userDoc });
+        if (matches.length > pageSize) break;
+      }
+    }
+
+    cursor = snapshot.docs[snapshot.docs.length - 1];
+    reachedEnd = snapshot.docs.length < scanPageSize;
   }
 
-  const snapshot = await getDocs(q);
-  const users = snapshot.docs
-    .map(docToUserProfile)
-    .filter((u): u is UserProfile => u !== null && u.uid !== currentUserId);
-
-  const hasMore = users.length > pageSize;
-  const results = hasMore ? users.slice(0, pageSize) : users;
-  const newLastDoc = hasMore ? snapshot.docs[pageSize - 1] : null;
-
-  return { users: results, lastDoc: newLastDoc };
+  const hasMore = matches.length > pageSize;
+  const results = matches.slice(0, pageSize);
+  return {
+    users: results.map(({ user }) => user),
+    lastDoc: hasMore ? results[pageSize - 1].snapshot : null,
+  };
 }
 
 // Get all users (for search)

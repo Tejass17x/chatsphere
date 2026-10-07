@@ -23,7 +23,12 @@ interface NotificationContextType {
   markAsRead: (notificationId: string) => Promise<void>;
   notifyFollowRequest: (toUid: string, fromName: string) => Promise<void>;
   notifyFollowAccepted: (toUid: string, fromName: string) => Promise<void>;
-  notifyNewMessage: (toUid: string, fromName: string, chatId: string) => Promise<void>;
+  notifyNewMessage: (
+    toUid: string,
+    fromName: string,
+    chatId: string,
+    messageId: string
+  ) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -80,13 +85,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const notifyNewMessage = async (toUid: string, fromName: string, chatId: string) => {
+  const notifyNewMessage = async (
+    toUid: string,
+    fromName: string,
+    chatId: string,
+    messageId: string
+  ) => {
     await createNotification(
       toUid,
       'new_message',
       'New Message',
       `${fromName} sent you a message`,
-      { fromUserId: firebaseUser?.uid || '', chatId }
+      { fromUserId: firebaseUser?.uid || '', chatId, messageId }
     );
   };
 

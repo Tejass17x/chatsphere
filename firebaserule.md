@@ -280,8 +280,10 @@ service cloud.firestore {
       && data.body is string
       && data.data is map
       && data.data.keys().hasAll(['fromUserId'])
+      && data.data.keys().hasOnly(['fromUserId', 'chatId', 'messageId'])
       && data.data.fromUserId is string
       && (data.data.get('chatId', null) == null || data.data.chatId is string)
+      && (data.data.get('messageId', null) == null || data.data.messageId is string)
       && data.read is bool
       && data.createdAt is timestamp;
     }
@@ -306,15 +308,22 @@ service cloud.firestore {
           || (
             data.type == 'new_message'
             && data.data.get('chatId', null) is string
+            && data.data.get('messageId', null) is string
             && request.auth.uid in get(
               /databases/$(database)/documents/chats/$(data.data.chatId)
             ).data.participants
             && recipientId in get(
               /databases/$(database)/documents/chats/$(data.data.chatId)
             ).data.participants
-            && isMutualChat(get(
-              /databases/$(database)/documents/chats/$(data.data.chatId)
-            ).data)
+            && get(
+              /databases/$(database)/documents/chats/$(data.data.chatId)/messages/$(data.data.messageId)
+            ).data.senderId == senderId
+            && get(
+              /databases/$(database)/documents/chats/$(data.data.chatId)/messages/$(data.data.messageId)
+            ).data.chatId == data.data.chatId
+            && get(
+              /databases/$(database)/documents/chats/$(data.data.chatId)/messages/$(data.data.messageId)
+            ).data.id == data.data.messageId
           )
         );
     }
