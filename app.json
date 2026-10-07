@@ -7,12 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "chatapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.chatapp.app"
@@ -35,6 +29,15 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to choose profile and chat photos."
+        }
+      ],
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
         }
       ]
     ],
