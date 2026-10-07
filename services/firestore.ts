@@ -527,51 +527,59 @@ export async function getOrCreateChat(
     throw new Error('You cannot start a chat with yourself.');
   }
 
-  const [user1, user2] = await Promise.all([
-    getUserProfile(userId1),
-    getUserProfile(userId2),
-  ]);
-  if (!user1 || !user2) {
-    throw new Error('One or both users were not found.');
-  }
-
   const participants = [userId1, userId2].sort();
   const chatId = participants.join('_');
   const chatRef = doc(db, COLLECTIONS.CHATS, chatId);
-  const chatSnap = await getDoc(chatRef);
+  const userRef1 = doc(db, COLLECTIONS.USERS, userId1);
+  const userRef2 = doc(db, COLLECTIONS.USERS, userId2);
 
-  // Existing conversations are always openable. The follow check below only
-  // gates *creating* a new chat — someone who unfollowed still needs to read
-  // the history they already share.
-  if (chatSnap.exists()) {
-    const existingChat = docToChat(chatSnap);
-    if (!existingChat) throw new Error('This conversation could not be loaded.');
-    return existingChat;
-  }
+  return runTransaction(db, async (transaction) => {
+    const chatSnap = await transaction.get(chatRef);
 
-  if (!canMessage(user1, user2)) {
-    throw new Error('Follow each other before starting a chat.');
-  }
+    // Returning an existing conversation is independent of the current follow
+    // relationship. Only creation of a new conversation requires mutual follows.
+    if (chatSnap.exists()) {
+      const existingChat = docToChat(chatSnap);
+      if (!existingChat) throw new Error('This conversation could not be loaded.');
+      if (!participants.every((uid) => existingChat.participants.includes(uid))) {
+        throw new Error('This conversation does not belong to these users.');
+      }
+      return existingChat;
+    }
 
-  const newChat: Omit<Chat, 'id'> = {
-    participants,
-    participantDetails: {
-      [userId1]: { displayName: user1.displayName, photoURL: user1.photoURL },
-      [userId2]: { displayName: user2.displayName, photoURL: user2.photoURL },
-    },
-    lastMessage: null,
-    lastMessageAt: new Date(),
-    unreadCount: { [userId1]: 0, [userId2]: 0 },
-    createdAt: new Date(),
-  };
+    const [userSnap1, userSnap2] = await Promise.all([
+      transaction.get(userRef1),
+      transaction.get(userRef2),
+    ]);
+    const user1 = docToUserProfile(userSnap1);
+    const user2 = docToUserProfile(userSnap2);
+    if (!user1 || !user2) {
+      throw new Error('One or both users were not found.');
+    }
+    if (!canMessage(user1, user2)) {
+      throw new Error('Follow each other before starting a chat.');
+    }
 
-  await setDoc(chatRef, {
-    ...newChat,
-    createdAt: serverTimestamp(),
-    lastMessageAt: serverTimestamp(),
+    const newChat: Omit<Chat, 'id'> = {
+      participants,
+      participantDetails: {
+        [userId1]: { displayName: user1.displayName, photoURL: user1.photoURL },
+        [userId2]: { displayName: user2.displayName, photoURL: user2.photoURL },
+      },
+      lastMessage: null,
+      lastMessageAt: new Date(),
+      unreadCount: { [userId1]: 0, [userId2]: 0 },
+      createdAt: new Date(),
+    };
+
+    transaction.set(chatRef, {
+      ...newChat,
+      createdAt: serverTimestamp(),
+      lastMessageAt: serverTimestamp(),
+    });
+
+    return { id: chatId, ...newChat };
   });
-
-  return { id: chatId, ...newChat };
 }
 
 // Get user's chats

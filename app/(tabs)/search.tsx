@@ -41,6 +41,64 @@ interface UserWithStatus extends UserProfile {
   followStatus: FollowStatus;
 }
 
+interface SearchBarProps {
+  query: string;
+  error: string | null;
+  actionError: string | null;
+  onChangeText: (text: string) => void;
+  onRetry: () => void;
+  onClearError: () => void;
+  onClearActionError: () => void;
+}
+
+function SearchBar({
+  query,
+  error,
+  actionError,
+  onChangeText,
+  onRetry,
+  onClearError,
+  onClearActionError,
+}: SearchBarProps) {
+  return (
+    <View>
+      <View style={styles.searchContainer}>
+        <LucideIcon name="search" size={20} color={COLORS.textTertiary} style={styles.searchIcon} />
+        <TextInput
+          placeholder="Search users..."
+          value={query}
+          onChangeText={onChangeText}
+          style={styles.searchInput}
+          placeholderTextColor={COLORS.textTertiary}
+          autoCapitalize="none"
+          autoComplete="off"
+        />
+        {query ? (
+          <TouchableOpacity
+            onPress={() => onChangeText('')}
+            style={styles.clearButton}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
+            <LucideIcon name="x" size={20} color={COLORS.textTertiary} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      {error ? (
+        <ErrorBanner
+          message={error}
+          actionLabel="Retry"
+          onAction={onRetry}
+          onDismiss={onClearError}
+        />
+      ) : null}
+      {actionError ? (
+        <ErrorBanner message={actionError} onDismiss={onClearActionError} />
+      ) : null}
+    </View>
+  );
+}
+
 export default function SearchScreen() {
   const router = useRouter();
   const { user, firebaseUser, patchUser, refreshProfile } = useAuth();
@@ -58,6 +116,7 @@ export default function SearchScreen() {
   // Opening a chat is a network round-trip, so it needs its own busy flag;
   // `actingOn` covers follow/unfollow writes, not navigation.
   const [openingChat, setOpeningChat] = useState<string | null>(null);
+  const openingChatRef = useRef<string | null>(null);
   // Errors are shown inline rather than through Alert.alert, which is a no-op
   // on react-native-web and would leave failures completely invisible.
   const [actionError, setActionError] = useState<string | null>(null);
@@ -364,8 +423,9 @@ export default function SearchScreen() {
   };
 
   const openChat = async (targetId: string) => {
-    if (!firebaseUser || openingChat === targetId) return;
+    if (!firebaseUser || openingChatRef.current === targetId) return;
 
+    openingChatRef.current = targetId;
     setOpeningChat(targetId);
     setActionError(null);
     try {
@@ -380,6 +440,7 @@ export default function SearchScreen() {
         error instanceof Error ? error.message : 'Could not open this chat. Please try again.'
       );
     } finally {
+      openingChatRef.current = null;
       setOpeningChat(null);
     }
   };
@@ -500,114 +561,72 @@ export default function SearchScreen() {
     <View style={styles.separator} />
   );
 
-  // Search input
-  const searchInput = (
-    <View>
-      <View style={styles.searchContainer}>
-        <LucideIcon name="search" size={20} color={COLORS.textTertiary} style={styles.searchIcon} />
-        <TextInput
-          placeholder="Search users..."
-          value={query}
-          onChangeText={handleSearchChange}
-          style={styles.searchInput}
-          placeholderTextColor={COLORS.textTertiary}
-          autoCapitalize="none"
-          autoComplete="off"
-        />
-        {query ? (
-          <TouchableOpacity
-            onPress={() => {
-              setQuery('');
-              performSearch('');
-            }}
-            style={styles.clearButton}
-          >
-            <LucideIcon name="x" size={20} color={COLORS.textTertiary} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-      {searchError ? (
-        <ErrorBanner
-          message={searchError}
-          actionLabel="Retry"
-          onAction={() => performSearch(query)}
-          onDismiss={() => setSearchError(null)}
-        />
-      ) : null}
-      {actionError ? <ErrorBanner message={actionError} onDismiss={() => setActionError(null)} /> : null}
-    </View>
-  );
-
-  if (initialLoad && loading) {
-    return (
-      <View style={styles.container}>
-        <AppHeader title="Search" subtitle="Find people to connect with" />
-        <FlatList
-          data={Array.from({ length: 5 })}
-          renderItem={() => <UserSkeleton />}
-          ItemSeparatorComponent={renderSeparator}
-          keyExtractor={(_, i) => `skeleton-${i}`}
-          ListHeaderComponent={() => searchInput}
-          ListFooterComponent={<View style={styles.listFooter} />}
-        />
-      </View>
-    );
-  }
-
-  if (users.length === 0 && !loading && !searchError) {
-    return (
-      <View style={styles.container}>
-        <AppHeader title="Search" subtitle="Find people to connect with" />
-        {searchInput}
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconWrap}>
-            <LucideIcon
-              name={query ? 'search' : 'users'}
-              size={30}
-              color={COLORS.primary}
-            />
-          </View>
-          <Text style={styles.emptyTitle}>
-            {query ? 'No matches' : 'No users yet'}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {query
-              ? `Nobody matches "${query}". Try a different name.`
-              : 'Once people create accounts they will show up here.'}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <AppHeader title="Search" subtitle="Find people to connect with" />
-      <FlatList
-        data={users}
-        renderItem={renderUser}
-        ItemSeparatorComponent={renderSeparator}
-        keyExtractor={(item) => item.uid}
-        ListHeaderComponent={() => searchInput}
-        ListFooterComponent={
-          <View style={styles.listFooter}>
-            {loadingMore && (
-              <View style={styles.loadMore}>
-                <ActivityIndicator size="small" color={COLORS.primary} />
-                <Text style={styles.loadMoreText}>Loading more...</Text>
-              </View>
-            )}
-            {!hasMore && users.length > 0 && (
-              <Text style={styles.endOfList}>End of list</Text>
-            )}
-          </View>
-        }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+      <SearchBar
+        query={query}
+        error={searchError}
+        actionError={actionError}
+        onChangeText={handleSearchChange}
+        onRetry={() => performSearch(query)}
+        onClearError={() => setSearchError(null)}
+        onClearActionError={() => setActionError(null)}
       />
+      <View style={styles.resultsContainer}>
+        {initialLoad && loading ? (
+          <FlatList
+            data={Array.from({ length: 5 })}
+            renderItem={() => <UserSkeleton />}
+            ItemSeparatorComponent={renderSeparator}
+            keyExtractor={(_, i) => `skeleton-${i}`}
+            ListFooterComponent={<View style={styles.listFooter} />}
+          />
+        ) : users.length === 0 && !loading && !searchError ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconWrap}>
+              <LucideIcon
+                name={query ? 'search' : 'users'}
+                size={30}
+                color={COLORS.primary}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>
+              {query ? 'No matches' : 'No users yet'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {query
+                ? `Nobody matches "${query}". Try a different name.`
+                : 'Once people create accounts they will show up here.'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={users}
+            renderItem={renderUser}
+            ItemSeparatorComponent={renderSeparator}
+            keyExtractor={(item) => item.uid}
+            ListFooterComponent={
+              <View style={styles.listFooter}>
+                {loadingMore && (
+                  <View style={styles.loadMore}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <Text style={styles.loadMoreText}>Loading more...</Text>
+                  </View>
+                )}
+                {!hasMore && users.length > 0 && (
+                  <Text style={styles.endOfList}>End of list</Text>
+                )}
+              </View>
+            }
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -616,6 +635,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  resultsContainer: {
+    flex: 1,
   },
   listContainer: {
     flex: 1,

@@ -8,6 +8,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { PresenceProvider } from '@/contexts/PresenceContext';
+import { LogBox } from 'react-native';
+
+// Ignore Firebase WebChannel warnings
+LogBox.ignoreLogs(['@firebase/firestore:', 'WebChannelConnection RPC']);
 
 /**
  * Watches auth state and keeps the navigator pointed at the right stack.
