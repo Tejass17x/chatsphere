@@ -8,7 +8,6 @@ import {
 } from 'firebase/auth';
 import { getReactNativePersistence } from 'firebase/auth';
 import {
-  getFirestore,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -73,14 +72,18 @@ export function getFirebaseAuth(): Auth {
 export function getFirestoreDb(): Firestore {
   if (!db) {
     const firebaseApp = getFirebaseApp();
-    try {
+    if (Platform.OS === 'web') {
       db = initializeFirestore(firebaseApp, {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager(),
         }),
       });
-    } catch {
-      db = getFirestore(firebaseApp);
+    } else {
+      // Firestore's React Native transport can fail on streaming WebChannel
+      // connections; long polling is more reliable on native networks.
+      db = initializeFirestore(firebaseApp, {
+        experimentalForceLongPolling: true,
+      });
     }
   }
   return db;
