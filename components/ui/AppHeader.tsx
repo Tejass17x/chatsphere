@@ -1,12 +1,10 @@
 // App Header with title, subtitle and notification bell
 
-import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,18 +48,23 @@ export const AppHeader = ({
 
       <View style={styles.right}>
         {showBell && (
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.push('/notifications')}
-            activeOpacity={0.7}
-          >
-            <LucideIcon name="bell" size={22} color={COLORS.textPrimary} />
+          <View style={styles.bellWrapper}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push('/notifications')}
+              activeOpacity={0.7}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+              accessibilityRole="button"
+              accessibilityLabel={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+            >
+              <LucideIcon name="bell" size={22} color={COLORS.textPrimary} />
+            </TouchableOpacity>
             {unreadCount > 0 && (
               <View style={styles.badgeContainer}>
                 <Badge count={unreadCount} size="sm" variant="danger" />
               </View>
             )}
-          </TouchableOpacity>
+          </View>
         )}
 
         {showAvatar && user && (
@@ -115,18 +118,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.xs,
   },
+  bellWrapper: {
+    position: 'relative',
+  },
   iconButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BORDER_RADIUS.full,
-    position: 'relative',
   },
   badgeContainer: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: -4,
+    right: -4,
+    zIndex: 1,
   },
   avatarButton: {
     width: 40,

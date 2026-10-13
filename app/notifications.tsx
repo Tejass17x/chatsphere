@@ -27,6 +27,8 @@ import { COLORS, SPACING, BORDER_RADIUS } from '@/utils/constants';
 import { Notification, UserProfile } from '@/types';
 
 export default function NotificationsScreen() {
+  console.log('[NotificationsScreen] Component mounted');
+
   const router = useRouter();
   const { user, firebaseUser } = useAuth();
   const { notifications, loading, markAsRead, notifyFollowAccepted } = useNotifications();

@@ -46,10 +46,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(true);
-    const unsubscribe = subscribeToUserNotifications(firebaseUser.uid, (items) => {
-      setNotifications(items);
-      setLoading(false);
-    });
+    const unsubscribe = subscribeToUserNotifications(
+      firebaseUser.uid,
+      (items) => {
+        setNotifications(items);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('[NotificationContext] subscribeToUserNotifications failed:', error);
+        // TEMPORARY: surface the raw error for debugging missing index/permission issues
+        setNotifications([]);
+        setLoading(false);
+      }
+    );
 
     return unsubscribe;
   }, [firebaseUser]);

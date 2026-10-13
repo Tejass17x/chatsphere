@@ -11,7 +11,9 @@
       "Bash(node -e ' *)",
       "WebFetch(domain:firebase.google.com)",
       "WebSearch",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(awk 'NR>=295 && NR<=310' app/\\\\\\(tabs\\\\\\)/profile.tsx)",
+      "Bash(awk 'NR>=290 && NR<=310' app/\\\\\\(tabs\\\\\\)/profile.tsx)"
     ]
   }
 }
